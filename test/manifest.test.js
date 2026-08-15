@@ -13,6 +13,15 @@ test("uses supported Chrome metadata and one version across project files", () =
   assert.equal(manifest.version, packageJson.version);
 });
 
+test("declares the public project and its open source license", () => {
+  assert.equal(packageJson.license, "MIT");
+  assert.equal(packageJson.repository.url, "git+https://github.com/Charlie284/no-paste.git");
+
+  const license = fs.readFileSync(path.join(root, "LICENSE"), "utf8");
+  assert.match(license, /^MIT License$/m);
+  assert.match(license, /Copyright \(c\) 2026 Charlie Harper/);
+});
+
 test("loads both paste defenses at document start in every accessible frame", () => {
   const mainWorld = manifest.content_scripts.find(({ world }) => world === "MAIN");
   const isolatedWorld = manifest.content_scripts.find(({ world }) => world === "ISOLATED");

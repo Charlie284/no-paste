@@ -49,3 +49,17 @@ pnpm package
 `pnpm test` runs the dependency-free unit and manifest tests. `pnpm test:e2e` launches Playwright's bundled Chromium with the unpacked extension and verifies native paste, editing surfaces, frames, shadow DOM, asynchronous clipboard reads, non-text paste, typing, and the blocked-paste notice.
 
 `pnpm package` writes a versioned, installable ZIP to `dist/`. Generated archives and test artifacts are ignored by Git.
+
+## Contributing
+
+Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and contribution guidelines.
+
+## Releases
+
+Release ZIPs contain only the extension's runtime files, icons, manifest, and MIT license. Each release is built from its matching Git tag with `pnpm package`.
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+## License
+
+No Paste is available under the [MIT License](LICENSE).
