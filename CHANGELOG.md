@@ -14,6 +14,7 @@ All notable changes to No Paste are documented here.
 ### Changed
 
 - Image-only paste and ordinary typing remain available.
+- Runtime code, release tooling, and tests are now maintained in TypeScript and compiled for Chrome.
 - Documentation now explains permissions, privacy, coverage, and browser limitations.
 
 [1.1.0]: https://github.com/Charlie284/no-paste/releases/tag/v1.1.0

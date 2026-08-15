@@ -1,18 +1,17 @@
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const test = require("node:test");
-const vm = require("node:vm");
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { test } from "node:test";
+import vm from "node:vm";
 
-const script = fs.readFileSync(path.join(__dirname, "..", "content.js"), "utf8");
+const script = fs.readFileSync(new URL("../build/content.js", import.meta.url), "utf8");
 
-function loadContentScript() {
+function loadContentScript(): EventTarget {
   const window = new EventTarget();
   vm.runInNewContext(script, { window });
   return window;
 }
 
-function browserEvent(type, properties) {
+function browserEvent(type: string, properties: Record<string, unknown>): Event {
   const event = new Event(type, { cancelable: true });
 
   for (const [name, value] of Object.entries(properties)) {
@@ -22,7 +21,10 @@ function browserEvent(type, properties) {
   return event;
 }
 
-function dispatchWithPageObserver(window, event) {
+function dispatchWithPageObserver(window: EventTarget, event: Event): {
+  accepted: boolean;
+  pageReceivedEvent: boolean;
+} {
   let pageReceivedEvent = false;
   window.addEventListener(event.type, () => {
     pageReceivedEvent = true;

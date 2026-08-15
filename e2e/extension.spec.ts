@@ -1,18 +1,25 @@
-const { expect, test, chromium } = require("@playwright/test");
-const fs = require("node:fs");
-const http = require("node:http");
-const os = require("node:os");
-const path = require("node:path");
+import {
+  chromium,
+  expect,
+  test,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
+import fs from "node:fs";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const extensionPath = path.join(__dirname, "..");
+const extensionPath = fileURLToPath(new URL("../build", import.meta.url));
 const pasteShortcut = process.platform === "darwin" ? "Meta+V" : "Control+V";
 
-let origin;
-let frameOrigin;
-let frameServer;
-let server;
+let origin: string;
+let frameOrigin: string;
+let frameServer: http.Server;
+let server: http.Server;
 
-const pageHtml = () => `<!doctype html>
+const pageHtml = (): string => `<!doctype html>
 <html lang="en">
   <body>
     <input id="input" aria-label="Input">
@@ -31,24 +38,39 @@ const pageHtml = () => `<!doctype html>
   </body>
 </html>`;
 
-async function startServer() {
+function getServerOrigin(activeServer: http.Server): string {
+  const address = activeServer.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Expected a TCP test server address.");
+  }
+  return `http://127.0.0.1:${address.port}`;
+}
+
+async function startServer(): Promise<void> {
   frameServer = http.createServer((_request, response) => {
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     response.end("<input id='origin-input' aria-label='Cross-origin frame input'>");
   });
-  await new Promise((resolve) => frameServer.listen(0, "127.0.0.1", resolve));
-  frameOrigin = `http://127.0.0.1:${frameServer.address().port}`;
+  await new Promise<void>((resolve) => frameServer.listen(0, "127.0.0.1", () => resolve()));
+  frameOrigin = getServerOrigin(frameServer);
 
   server = http.createServer((_request, response) => {
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     response.end(pageHtml());
   });
 
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  origin = `http://127.0.0.1:${server.address().port}`;
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  origin = getServerOrigin(server);
 }
 
-async function launchContext({ withExtension }) {
+interface LaunchedContext {
+  context: BrowserContext;
+  userDataDir: string;
+}
+
+async function launchContext(
+  { withExtension }: { withExtension: boolean },
+): Promise<LaunchedContext> {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "no-paste-"));
   const args = withExtension
     ? [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`]
@@ -63,25 +85,29 @@ async function launchContext({ withExtension }) {
   return { context, userDataDir };
 }
 
-async function closeContext({ context, userDataDir }) {
+async function closeContext({ context, userDataDir }: LaunchedContext): Promise<void> {
   await context.close();
   fs.rmSync(userDataDir, { recursive: true, force: true });
 }
 
-async function openTestPage(context) {
+async function openTestPage(context: BrowserContext): Promise<Page> {
   const page = context.pages()[0] ?? (await context.newPage());
   await page.goto(origin);
   return page;
 }
 
-async function putTextOnClipboard(page, text) {
+async function putTextOnClipboard(page: Page, text: string): Promise<void> {
   await page.evaluate((value) => navigator.clipboard.writeText(value), text);
 }
 
 test.beforeAll(startServer);
 test.afterAll(async () => {
-  await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  await new Promise((resolve, reject) => frameServer.close((error) => (error ? reject(error) : resolve())));
+  await new Promise<void>((resolve, reject) => (
+    server.close((error) => (error ? reject(error) : resolve()))
+  ));
+  await new Promise<void>((resolve, reject) => (
+    frameServer.close((error) => (error ? reject(error) : resolve()))
+  ));
 });
 
 test("control browser can paste clipboard text", async () => {
@@ -141,12 +167,16 @@ test("blocks asynchronous text reads in the page world", async () => {
     await putTextOnClipboard(page, "blocked text");
 
     const errors = await page.evaluate(async () => {
-      const capture = async (operation) => {
+      const capture = async (
+        operation: () => Promise<unknown>,
+      ): Promise<{ name: string; message: string } | null> => {
         try {
           await operation();
           return null;
         } catch (error) {
-          return { name: error.name, message: error.message };
+          return error instanceof Error
+            ? { name: error.name, message: error.message }
+            : { name: "Error", message: String(error) };
         }
       };
 
@@ -202,8 +232,20 @@ test("allows ordinary typing and image-only paste events", async () => {
       const canvas = document.createElement("canvas");
       canvas.width = 1;
       canvas.height = 1;
-      canvas.getContext("2d").fillRect(0, 0, 1, 1);
-      const image = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      const drawingContext = canvas.getContext("2d");
+      if (!drawingContext) {
+        throw new Error("Canvas 2D context is unavailable.");
+      }
+      drawingContext.fillRect(0, 0, 1, 1);
+      const image = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error("Failed to create the clipboard image."));
+          }
+        }, "image/png");
+      });
       await navigator.clipboard.write([new ClipboardItem({ "image/png": image })]);
       const items = await navigator.clipboard.read();
       return items.flatMap((item) => item.types);

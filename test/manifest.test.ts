@@ -1,16 +1,50 @@
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const test = require("node:test");
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
-const root = path.join(__dirname, "..");
-const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
-const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+interface ContentScriptRegistration {
+  matches: string[];
+  js: string[];
+  run_at: string;
+  all_frames: boolean;
+  match_about_blank: boolean;
+  match_origin_as_fallback: boolean;
+  world: "MAIN" | "ISOLATED";
+}
+
+interface ExtensionManifest {
+  manifest_version: number;
+  minimum_chrome_version: string;
+  version: string;
+  content_scripts: ContentScriptRegistration[];
+  icons: Record<string, string>;
+  permissions?: unknown;
+  host_permissions?: unknown;
+}
+
+interface PackageMetadata {
+  version: string;
+  license: string;
+  engines: { node: string };
+  repository: { url: string };
+}
+
+const root = fileURLToPath(new URL("../", import.meta.url));
+const build = path.join(root, "build");
+const manifest = JSON.parse(
+  fs.readFileSync(path.join(root, "manifest.json"), "utf8"),
+) as ExtensionManifest;
+const packageJson = JSON.parse(
+  fs.readFileSync(path.join(root, "package.json"), "utf8"),
+) as PackageMetadata;
 
 test("uses supported Chrome metadata and one version across project files", () => {
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.minimum_chrome_version, "111");
   assert.equal(manifest.version, packageJson.version);
+  assert.equal(packageJson.engines.node, ">=20.6");
 });
 
 test("declares the public project and its open source license", () => {
@@ -25,6 +59,8 @@ test("declares the public project and its open source license", () => {
 test("loads both paste defenses at document start in every accessible frame", () => {
   const mainWorld = manifest.content_scripts.find(({ world }) => world === "MAIN");
   const isolatedWorld = manifest.content_scripts.find(({ world }) => world === "ISOLATED");
+  assert.ok(mainWorld);
+  assert.ok(isolatedWorld);
 
   assert.deepEqual(mainWorld.js, ["clipboard-guard.js"]);
   assert.deepEqual(isolatedWorld.js, ["content.js"]);
@@ -35,7 +71,7 @@ test("loads both paste defenses at document start in every accessible frame", ()
     assert.equal(registration.all_frames, true);
     assert.equal(registration.match_about_blank, true);
     assert.equal(registration.match_origin_as_fallback, true);
-    assert.equal(fs.existsSync(path.join(root, registration.js[0])), true);
+    assert.equal(fs.existsSync(path.join(build, registration.js[0]!)), true);
   }
 });
 

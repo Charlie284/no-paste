@@ -25,12 +25,14 @@
       font: 600 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
   `;
-  let hideNoticeTimer;
-  let noticeHost;
+  let hideNoticeTimer: number | undefined;
+  let noticeHost: HTMLDivElement | undefined;
 
-  const hasTextType = (types) => Array.from(types ?? []).some((type) => type.startsWith("text/"));
+  const hasTextType = (
+    types: ArrayLike<string> | Iterable<string> | null | undefined,
+  ): boolean => Array.from(types ?? []).some((type) => type.startsWith("text/"));
 
-  const createNotice = () => {
+  const createNotice = (): HTMLDivElement => {
     const host = document.createElement("div");
     host.setAttribute("aria-label", "Text paste blocked.");
     host.setAttribute("aria-live", "polite");
@@ -47,7 +49,7 @@
     return host;
   };
 
-  const showBlockedNotice = () => {
+  const showBlockedNotice = (): void => {
     if (typeof document === "undefined" || !document.documentElement) {
       return;
     }
@@ -59,25 +61,29 @@
     noticeHost.hidden = false;
     window.clearTimeout(hideNoticeTimer);
     hideNoticeTimer = window.setTimeout(() => {
-      noticeHost.hidden = true;
+      if (noticeHost) {
+        noticeHost.hidden = true;
+      }
     }, NOTICE_DURATION_MS);
   };
 
-  const blockEvent = (event) => {
+  const blockEvent = (event: Event): void => {
     event.preventDefault();
     event.stopImmediatePropagation();
     showBlockedNotice();
   };
 
-  const blockTextPaste = (event) => {
+  const blockTextPaste = (event: ClipboardEvent): void => {
     if (hasTextType(event.clipboardData?.types)) {
       blockEvent(event);
     }
   };
 
-  const blockPasteInput = (event) => {
-    const isPasteInput = event.inputType === "insertFromPaste" || event.inputType === "insertFromPasteAsQuotation";
-    const containsText = typeof event.data === "string" || hasTextType(event.dataTransfer?.types);
+  const blockPasteInput = (event: InputEvent): void => {
+    const isPasteInput = event.inputType === "insertFromPaste"
+      || event.inputType === "insertFromPasteAsQuotation";
+    const containsText = typeof event.data === "string"
+      || hasTextType(event.dataTransfer?.types);
 
     if (isPasteInput && containsText) {
       blockEvent(event);

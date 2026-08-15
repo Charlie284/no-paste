@@ -1,20 +1,33 @@
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const test = require("node:test");
-const vm = require("node:vm");
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { test } from "node:test";
+import vm from "node:vm";
 
-const script = fs.readFileSync(path.join(__dirname, "..", "clipboard-guard.js"), "utf8");
+const script = fs.readFileSync(new URL("../build/clipboard-guard.js", import.meta.url), "utf8");
 
-function guardedClipboard(items = []) {
+interface TestClipboard {
+  items: ClipboardItemLike[];
+  read(): Promise<ClipboardItemLike[]>;
+  readText(): Promise<string>;
+}
+
+interface ClipboardItemLike {
+  types: string[];
+}
+
+function clipboardItem(...types: string[]): ClipboardItemLike {
+  return { types };
+}
+
+function guardedClipboard(items: ClipboardItemLike[] = []): TestClipboard {
   const clipboard = Object.create({
-    async read() {
+    async read(this: TestClipboard): Promise<ClipboardItemLike[]> {
       return this.items;
     },
-    async readText() {
+    async readText(): Promise<string> {
       return "clipboard text";
     },
-  });
+  }) as TestClipboard;
   clipboard.items = items;
 
   vm.runInNewContext(script, {
@@ -35,7 +48,7 @@ test("blocks asynchronous clipboard text reads", async () => {
 });
 
 test("blocks asynchronous clipboard item reads that contain text", async () => {
-  const clipboard = guardedClipboard([{ types: ["image/png", "text/html"] }]);
+  const clipboard = guardedClipboard([clipboardItem("image/png", "text/html")]);
 
   await assert.rejects(clipboard.read(), {
     name: "NotAllowedError",
@@ -44,7 +57,7 @@ test("blocks asynchronous clipboard item reads that contain text", async () => {
 });
 
 test("allows asynchronous clipboard item reads that contain only images", async () => {
-  const items = [{ types: ["image/png"] }];
+  const items = [clipboardItem("image/png")];
   const clipboard = guardedClipboard(items);
 
   assert.deepEqual(await clipboard.read(), items);

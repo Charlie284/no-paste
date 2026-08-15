@@ -4,13 +4,14 @@ No Paste is a Chrome extension that blocks text from being pasted into webpages 
 
 It handles native paste actions and adds a best-effort guard against webpages reading text through the asynchronous Clipboard API. Both defenses start before page content loads and run in every frame Chrome permits the extension to access.
 
-## Install
+## Install a release
 
-1. Open `chrome://extensions` in Google Chrome.
-2. Turn on **Developer mode**.
-3. Click **Load unpacked**.
-4. Select this folder.
-5. Reload tabs that were already open.
+1. Download and extract the release ZIP.
+2. Open `chrome://extensions` in Google Chrome.
+3. Turn on **Developer mode**.
+4. Click **Load unpacked**.
+5. Select the extracted folder.
+6. Reload tabs that were already open.
 
 Chrome 111 or newer is required.
 
@@ -37,18 +38,21 @@ The extension does not inspect pasted text, collect browsing data, store anythin
 
 ## Development
 
-Requirements: Node.js 20 or newer and pnpm 11.
+Requirements: Node.js 20.6 or newer and pnpm 11.
 
 ```sh
 pnpm install
 pnpm exec playwright install chromium
+pnpm build
 pnpm check
 pnpm package
 ```
 
-`pnpm test` runs the dependency-free unit and manifest tests. `pnpm test:e2e` launches Playwright's bundled Chromium with the unpacked extension and verifies native paste, editing surfaces, frames, shadow DOM, asynchronous clipboard reads, non-text paste, typing, and the blocked-paste notice.
+The extension and its development tooling are written in TypeScript. `pnpm build` compiles an unpacked extension to `build/`; select that directory in Chrome when developing from source.
 
-`pnpm package` writes a versioned, installable ZIP to `dist/`. Generated archives and test artifacts are ignored by Git.
+`pnpm test` builds the extension and runs the unit, manifest, and package tests. `pnpm test:e2e` launches Playwright's bundled Chromium with the compiled extension and verifies native paste, editing surfaces, frames, shadow DOM, asynchronous clipboard reads, non-text paste, typing, and the blocked-paste notice.
+
+`pnpm check` also runs strict TypeScript checking. `pnpm package` compiles the TypeScript sources and writes a versioned, installable ZIP to `dist/`. Generated build output, archives, and test artifacts are ignored by Git.
 
 ## Contributing
 
@@ -56,7 +60,7 @@ Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 
 ## Releases
 
-Release ZIPs contain only the extension's runtime files, icons, manifest, and MIT license. Each release is built from its matching Git tag with `pnpm package`.
+Release ZIPs contain only compiled JavaScript, icons, the extension manifest, and the MIT license. Each release is built from its matching Git tag with `pnpm package`.
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
