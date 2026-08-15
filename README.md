@@ -1,6 +1,8 @@
 # No Paste
 
-A minimal Chrome extension that blocks paste operations on webpages. It runs at document start and covers embedded frames that Chrome permits extensions to access.
+No Paste is a Chrome extension that blocks text from being pasted into webpages while leaving ordinary typing and image-only paste available. A small notice appears whenever text paste is blocked.
+
+It handles native paste actions and adds a best-effort guard against webpages reading text through the asynchronous Clipboard API. Both defenses start before page content loads and run in every frame Chrome permits the extension to access.
 
 ## Install
 
@@ -8,16 +10,42 @@ A minimal Chrome extension that blocks paste operations on webpages. It runs at 
 2. Turn on **Developer mode**.
 3. Click **Load unpacked**.
 4. Select this folder.
+5. Reload tabs that were already open.
 
-The extension takes effect immediately on newly loaded pages. Reload tabs that were already open when you installed it.
+Chrome 111 or newer is required.
 
-To cover local `file://` pages, open the extension's details page and turn on **Allow access to file URLs**.
+## Coverage and access
 
-## What it blocks
+The extension blocks text paste from keyboard shortcuts, Chrome's context menu, `beforeinput` paste actions, and webpage calls to `navigator.clipboard.readText()` or text-bearing `navigator.clipboard.read()` results.
 
-- Keyboard paste shortcuts such as <kbd>Command</kbd>+<kbd>V</kbd> and <kbd>Ctrl</kbd>+<kbd>V</kbd>
-- Context-menu paste
-- Browser paste actions that emit `beforeinput` with a paste input type
-- Paste inside accessible iframes, including matching `about:blank` and origin-fallback frames
+Chrome gives users final control over where extensions run:
 
-Chrome does not allow extensions to run on protected browser pages such as `chrome://` URLs, the Chrome Web Store, or Chrome's built-in PDF viewer. The extension cannot block paste in the browser's address bar or in other applications.
+- Turn on **Allow in Incognito** on the extension's details page to cover incognito windows.
+- Turn on **Allow access to file URLs** to cover local `file://` pages.
+- Leave site access set to **On all sites**. Selecting **On click** or specific sites disables automatic blocking elsewhere.
+- Install the extension separately in every Chrome profile where it is needed.
+
+Chrome prevents extensions from running on protected browser pages, including `chrome://` URLs, the Chrome Web Store, and the built-in PDF viewer. No extension can block paste in the address bar, other applications, or pages where Chrome or the user has denied it access.
+
+The asynchronous Clipboard API guard runs in the webpage's JavaScript world. It raises the bar for custom paste buttons, but a hostile webpage or another extension may be able to interfere with webpage code. No Paste should not be treated as a security boundary.
+
+## Privacy and permissions
+
+No Paste requests automatic access to webpages through the `<all_urls>` content-script match so it can block paste without requiring a click on every site. Chrome may describe this as permission to read and change data on visited websites.
+
+The extension does not inspect pasted text, collect browsing data, store anything, make network requests, or transmit data. It has no API permissions, background worker, analytics, or remote code.
+
+## Development
+
+Requirements: Node.js 20 or newer and pnpm 11.
+
+```sh
+pnpm install
+pnpm exec playwright install chromium
+pnpm check
+pnpm package
+```
+
+`pnpm test` runs the dependency-free unit and manifest tests. `pnpm test:e2e` launches Playwright's bundled Chromium with the unpacked extension and verifies native paste, editing surfaces, frames, shadow DOM, asynchronous clipboard reads, non-text paste, typing, and the blocked-paste notice.
+
+`pnpm package` writes a versioned, installable ZIP to `dist/`. Generated archives and test artifacts are ignored by Git.

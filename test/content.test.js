@@ -6,64 +6,96 @@ const vm = require("node:vm");
 
 const script = fs.readFileSync(path.join(__dirname, "..", "content.js"), "utf8");
 
-function loadListeners() {
-  const listeners = new Map();
-  const window = {
-    addEventListener(type, listener, capture) {
-      listeners.set(type, { listener, capture });
-    },
-  };
-
+function loadContentScript() {
+  const window = new EventTarget();
   vm.runInNewContext(script, { window });
-  return listeners;
+  return window;
 }
 
-function fakeEvent(inputType) {
+function browserEvent(type, properties) {
+  const event = new Event(type, { cancelable: true });
+
+  for (const [name, value] of Object.entries(properties)) {
+    Object.defineProperty(event, name, { value });
+  }
+
+  return event;
+}
+
+function dispatchWithPageObserver(window, event) {
+  let pageReceivedEvent = false;
+  window.addEventListener(event.type, () => {
+    pageReceivedEvent = true;
+  });
+
   return {
-    inputType,
-    prevented: false,
-    stopped: false,
-    preventDefault() {
-      this.prevented = true;
-    },
-    stopImmediatePropagation() {
-      this.stopped = true;
-    },
+    accepted: window.dispatchEvent(event),
+    pageReceivedEvent,
   };
 }
 
-test("registers paste defenses in the capture phase", () => {
-  const listeners = loadListeners();
+test("native text paste is canceled before the page receives it", () => {
+  const window = loadContentScript();
+  const event = browserEvent("paste", {
+    clipboardData: { types: ["text/plain"] },
+  });
 
-  assert.equal(listeners.get("paste").capture, true);
-  assert.equal(listeners.get("beforeinput").capture, true);
+  const result = dispatchWithPageObserver(window, event);
+
+  assert.equal(result.accepted, false);
+  assert.equal(result.pageReceivedEvent, false);
 });
 
-test("blocks paste events", () => {
-  const event = fakeEvent();
+test("native image-only paste continues to the page", () => {
+  const window = loadContentScript();
+  const event = browserEvent("paste", {
+    clipboardData: { types: ["image/png"] },
+  });
 
-  loadListeners().get("paste").listener(event);
+  const result = dispatchWithPageObserver(window, event);
 
-  assert.equal(event.prevented, true);
-  assert.equal(event.stopped, true);
+  assert.equal(result.accepted, true);
+  assert.equal(result.pageReceivedEvent, true);
 });
 
-test("blocks beforeinput paste variants", () => {
-  const listener = loadListeners().get("beforeinput").listener;
-
+test("text paste beforeinput variants are canceled", () => {
   for (const inputType of ["insertFromPaste", "insertFromPasteAsQuotation"]) {
-    const event = fakeEvent(inputType);
-    listener(event);
-    assert.equal(event.prevented, true);
-    assert.equal(event.stopped, true);
+    const window = loadContentScript();
+    const event = browserEvent("beforeinput", {
+      data: "pasted text",
+      inputType,
+    });
+
+    const result = dispatchWithPageObserver(window, event);
+
+    assert.equal(result.accepted, false);
+    assert.equal(result.pageReceivedEvent, false);
   }
 });
 
-test("does not block non-paste input", () => {
-  const event = fakeEvent("insertText");
+test("image-only paste beforeinput continues to the page", () => {
+  const window = loadContentScript();
+  const event = browserEvent("beforeinput", {
+    data: null,
+    dataTransfer: { types: ["image/png"] },
+    inputType: "insertFromPaste",
+  });
 
-  loadListeners().get("beforeinput").listener(event);
+  const result = dispatchWithPageObserver(window, event);
 
-  assert.equal(event.prevented, false);
-  assert.equal(event.stopped, false);
+  assert.equal(result.accepted, true);
+  assert.equal(result.pageReceivedEvent, true);
+});
+
+test("ordinary text input continues to the page", () => {
+  const window = loadContentScript();
+  const event = browserEvent("beforeinput", {
+    data: "typed text",
+    inputType: "insertText",
+  });
+
+  const result = dispatchWithPageObserver(window, event);
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.pageReceivedEvent, true);
 });

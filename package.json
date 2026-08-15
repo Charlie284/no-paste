@@ -1,0 +1,21 @@
+{
+  "name": "no-paste",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Chrome extension that blocks text paste operations on webpages.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "pnpm run test:syntax && pnpm run test:unit && pnpm run test:e2e",
+    "package": "bash scripts/package.sh",
+    "test": "pnpm run test:unit",
+    "test:e2e": "playwright test",
+    "test:syntax": "bash -n scripts/package.sh && node --check content.js && node --check clipboard-guard.js && node --check playwright.config.js && node --check e2e/extension.spec.js",
+    "test:unit": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  },
+  "packageManager": "pnpm@11.19.0"
+}
