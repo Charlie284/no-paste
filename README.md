@@ -4,9 +4,19 @@ No Paste is a Chrome extension that blocks text from being pasted into webpages 
 
 It handles native paste actions and adds a best-effort guard against webpages reading text through the asynchronous Clipboard API. Both defenses start before page content loads and run in every frame Chrome permits the extension to access.
 
-## Install a release
+## Install a development build
 
-1. Download and extract the release ZIP.
+No GitHub Release has been published yet. Build the current source with Node.js 20.6 or newer and
+pnpm 11:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm package
+```
+
+Then:
+
+1. Extract `dist/no-paste-1.1.0.zip`.
 2. Open `chrome://extensions` in Google Chrome.
 3. Turn on **Developer mode**.
 4. Click **Load unpacked**.
@@ -58,9 +68,10 @@ The extension and its development tooling are written in TypeScript. `pnpm build
 
 Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and contribution guidelines.
 
-## Releases
+## Release packages
 
-Release ZIPs contain only compiled JavaScript, icons, the extension manifest, and the MIT license. Each release is built from its matching Git tag with `pnpm package`.
+Generated ZIPs contain only compiled JavaScript, icons, the extension manifest, and the MIT license.
+When a public release is created, it should be built from its matching Git tag with `pnpm package`.
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
