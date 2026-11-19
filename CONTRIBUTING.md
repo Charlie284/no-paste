@@ -4,7 +4,7 @@ Bug reports and focused pull requests are welcome.
 
 ## Development setup
 
-No Paste requires Node.js 20.6 or newer and pnpm 11.
+No Paste requires Node.js 22.13 or newer and pnpm 11.
 
 ```sh
 pnpm install
