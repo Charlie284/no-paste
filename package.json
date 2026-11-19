@@ -14,7 +14,7 @@
   },
   "homepage": "https://github.com/Charlie284/no-paste#readme",
   "engines": {
-    "node": ">=20.6"
+    "node": ">=22.13"
   },
   "scripts": {
     "build": "node --import tsx scripts/build.ts",

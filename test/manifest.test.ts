@@ -44,7 +44,7 @@ test("uses supported Chrome metadata and one version across project files", () =
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.minimum_chrome_version, "111");
   assert.equal(manifest.version, packageJson.version);
-  assert.equal(packageJson.engines.node, ">=20.6");
+  assert.equal(packageJson.engines.node, ">=22.13");
 });
 
 test("declares the public project and its open source license", () => {

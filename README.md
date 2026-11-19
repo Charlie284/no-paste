@@ -6,7 +6,7 @@ It handles native paste actions and adds a best-effort guard against webpages re
 
 ## Install a development build
 
-No GitHub Release has been published yet. Build the current source with Node.js 20.6 or newer and
+No GitHub Release has been published yet. Build the current source with Node.js 22.13 or newer and
 pnpm 11:
 
 ```sh
@@ -48,7 +48,7 @@ The extension does not inspect pasted text, collect browsing data, store anythin
 
 ## Development
 
-Requirements: Node.js 20.6 or newer and pnpm 11.
+Requirements: Node.js 22.13 or newer and pnpm 11.
 
 ```sh
 pnpm install
