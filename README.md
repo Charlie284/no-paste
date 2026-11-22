@@ -64,6 +64,12 @@ The extension and its development tooling are written in TypeScript. `pnpm build
 
 `pnpm check` also runs strict TypeScript checking. `pnpm package` compiles the TypeScript sources and writes a versioned, installable ZIP to `dist/`. Generated build output, archives, and test artifacts are ignored by Git.
 
+## Documentation
+
+- [Architecture](docs/architecture.md) — how the two content-script worlds work together.
+- [Testing](docs/testing.md) — unit, manifest, package, and end-to-end test guide.
+- [Releasing](docs/releasing.md) — packaging and release checklist.
+
 ## Contributing
 
 Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and contribution guidelines.
