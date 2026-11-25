@@ -2,6 +2,13 @@
 
 All notable changes to No Paste are documented here.
 
+## Unreleased
+
+### Added
+
+- An optional image-paste blocking setting in the extension options. It is off by default, persists locally without new permissions, and applies only where Chrome already permits the extension to run.
+- Image-aware blocked-paste notices and asynchronous Clipboard API guarding when the setting is enabled.
+
 ## [1.1.0] - 2026-08-15
 
 ### Added

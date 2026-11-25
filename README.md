@@ -1,6 +1,6 @@
 # No Paste
 
-No Paste is a Chrome extension that blocks text from being pasted into webpages while leaving ordinary typing and image-only paste available. A small notice appears whenever text paste is blocked.
+No Paste is a Chrome extension that blocks text from being pasted into webpages while leaving ordinary typing available. Image-only paste remains available by default, and the extension's options page includes an optional setting that blocks image paste too. A small notice appears whenever paste is blocked.
 
 It handles native paste actions and adds a best-effort guard against webpages reading text through the asynchronous Clipboard API. Both defenses start before page content loads and run in every frame Chrome permits the extension to access.
 
@@ -27,7 +27,7 @@ Chrome 111 or newer is required.
 
 ## Coverage and access
 
-The extension blocks text paste from keyboard shortcuts, Chrome's context menu, `beforeinput` paste actions, and webpage calls to `navigator.clipboard.readText()` or text-bearing `navigator.clipboard.read()` results.
+The extension blocks text paste from keyboard shortcuts, Chrome's context menu, `beforeinput` paste actions, and webpage calls to `navigator.clipboard.readText()` or text-bearing `navigator.clipboard.read()` results. When the optional image setting is enabled, image-bearing paste events and image-only asynchronous clipboard reads are blocked as well. Mixed text-and-image clipboard data is always blocked because it contains text.
 
 Chrome gives users final control over where extensions run:
 
@@ -44,7 +44,7 @@ The asynchronous Clipboard API guard runs in the webpage's JavaScript world. It 
 
 No Paste requests automatic access to webpages through the `<all_urls>` content-script match so it can block paste without requiring a click on every site. Chrome may describe this as permission to read and change data on visited websites.
 
-The extension does not inspect pasted text, collect browsing data, store anything, make network requests, or transmit data. It has no API permissions, background worker, analytics, or remote code.
+The extension decides what to block from clipboard format metadata such as `text/plain` or `image/png`. It does not read pasted text or image contents, collect browsing data, make network requests, or transmit data. The only persistent data is the local boolean image-blocking setting, stored in the extension's IndexedDB database. It has no API permissions, analytics, or remote code; its small service worker only relays that setting to pages where Chrome already allows the content scripts to run.
 
 ## Development
 
@@ -60,7 +60,7 @@ pnpm package
 
 The extension and its development tooling are written in TypeScript. `pnpm build` compiles an unpacked extension to `build/`; select that directory in Chrome when developing from source.
 
-`pnpm test` builds the extension and runs the unit, manifest, and package tests. `pnpm test:e2e` launches Playwright's bundled Chromium with the compiled extension and verifies native paste, editing surfaces, frames, shadow DOM, asynchronous clipboard reads, non-text paste, typing, and the blocked-paste notice.
+`pnpm test` builds the extension and runs the unit, manifest, and package tests. `pnpm test:e2e` launches Playwright's bundled Chromium with the compiled extension and verifies native paste, editing surfaces, frames, shadow DOM, asynchronous clipboard reads, image-only and mixed clipboard cases, the optional image-blocking setting, typing, and the blocked-paste notice. Set `NO_PASTE_CHROMIUM_EXECUTABLE` to a locally installed Chromium-compatible browser if the Playwright browser is not installed.
 
 `pnpm check` also runs strict TypeScript checking. `pnpm package` compiles the TypeScript sources and writes a versioned, installable ZIP to `dist/`. Generated build output, archives, and test artifacts are ignored by Git.
 
@@ -76,7 +76,7 @@ Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 
 ## Release packages
 
-Generated ZIPs contain only compiled JavaScript, icons, the extension manifest, and the MIT license.
+Generated ZIPs contain only compiled JavaScript, the options page, icons, the extension manifest, and the MIT license.
 When a public release is created, it should be built from its matching Git tag with `pnpm package`.
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.

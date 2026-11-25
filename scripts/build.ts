@@ -9,6 +9,7 @@ export const buildDirectory = path.join(projectDirectory, "build");
 const staticFiles = [
   "LICENSE",
   "manifest.json",
+  "options.html",
   "icons/icon-16.png",
   "icons/icon-32.png",
   "icons/icon-48.png",
@@ -21,8 +22,10 @@ export async function buildExtension(): Promise<void> {
 
   await build({
     entryPoints: {
+      background: path.join(projectDirectory, "src", "background.ts"),
       "clipboard-guard": path.join(projectDirectory, "src", "clipboard-guard.ts"),
       content: path.join(projectDirectory, "src", "content.ts"),
+      options: path.join(projectDirectory, "src", "options.ts"),
     },
     outdir: buildDirectory,
     bundle: true,

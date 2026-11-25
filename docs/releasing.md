@@ -20,7 +20,8 @@ and writes `dist/no-paste-<version>.zip`. The version comes from
 
 The ZIP contains only what the unpacked extension needs:
 
-- `clipboard-guard.js` and `content.js` (compiled, bundled)
+- `background.js`, `clipboard-guard.js`, `content.js`, and `options.js` (compiled, bundled)
+- `options.html`
 - `manifest.json`
 - `icons/icon-{16,32,48,128}.png`
 - `LICENSE`
@@ -40,4 +41,6 @@ No TypeScript sources, tests, tooling, or `node_modules` are included.
 
 Extract the ZIP, load the folder at `chrome://extensions` with
 Developer mode on, and reload open tabs. Verify a text paste is blocked
-with the notice, and that an image-only paste still works.
+with the notice, an image-only paste still works by default, and the
+options page image-blocking setting blocks a subsequent image-only paste
+when enabled.

@@ -15,8 +15,10 @@ interface ContentScriptRegistration {
 }
 
 interface ExtensionManifest {
+  background: { service_worker: string };
   manifest_version: number;
   minimum_chrome_version: string;
+  options_ui: { page: string; open_in_tab: boolean };
   version: string;
   content_scripts: ContentScriptRegistration[];
   icons: Record<string, string>;
@@ -54,6 +56,14 @@ test("declares the public project and its open source license", () => {
   const license = fs.readFileSync(path.join(root, "LICENSE"), "utf8");
   assert.match(license, /^MIT License$/m);
   assert.match(license, /Copyright \(c\) 2026 Charlie Harper/);
+});
+
+test("declares the permission-free settings service worker and explanatory options page", () => {
+  assert.equal(manifest.background.service_worker, "background.js");
+  assert.deepEqual(manifest.options_ui, { page: "options.html", open_in_tab: true });
+  assert.equal(fs.existsSync(path.join(build, "background.js")), true);
+  assert.equal(fs.existsSync(path.join(build, "options.html")), true);
+  assert.equal(fs.existsSync(path.join(build, "options.js")), true);
 });
 
 test("loads both paste defenses at document start in every accessible frame", () => {

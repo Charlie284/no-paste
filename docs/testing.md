@@ -18,10 +18,12 @@ Run with `node --import tsx --test` (the built-in `node:test` runner).
 Each file exercises one concern:
 
 - `clipboard-guard.test.ts` — the MAIN-world Clipboard API guard:
-  `readText` rejection, `read` filtering by `text/*` type, non-text
+  `readText` rejection, `read` filtering by `text/*` and optional
+  `image/*` type metadata, mixed clipboard precedence, non-text
   pass-through, and the `no-paste:blocked` event dispatch.
 - `content.test.ts` — the isolated-world paste/`beforeinput` blocking
-  logic and the blocked-paste notice lifecycle.
+  logic for text-only, image-only, and mixed clipboard formats, the
+  optional image-setting message path, and ordinary-input pass-through.
 - `manifest.test.ts` — the manifest stays valid: MV3, both content
   scripts present with the right `world`, `run_at`, `all_frames`, and
   match settings, required icons declared, no unexpected permissions.
@@ -32,7 +34,9 @@ Each file exercises one concern:
 
 `e2e/extension.spec.ts` launches Playwright's bundled Chromium with the
 compiled extension loaded via `--load-extension` against a local test
-server. One-time setup:
+server. Set `NO_PASTE_CHROMIUM_EXECUTABLE` to a locally installed
+Chromium-compatible browser executable when the Playwright browser is
+not present. One-time setup for Playwright's own browser:
 
 ```sh
 pnpm exec playwright install chromium
@@ -42,11 +46,19 @@ The suite covers:
 
 - A **control browser** (extension not loaded) proving the harness
   itself can paste, so extension-side failures are real failures.
-- Text paste blocked in inputs, textareas, `contenteditable`, shadow
-  DOM, `srcdoc`/`data:` frames, and a cross-origin frame.
+- Text paste blocked in inputs, textareas, `contenteditable`, a
+  noneditable custom paste target, shadow DOM, `srcdoc`/`data:` frames,
+  and a cross-origin frame.
 - Asynchronous `navigator.clipboard.readText()` and `read()` rejection.
-- Non-text paste (image data) and ordinary typing still working.
-- The "Text paste blocked." notice appearing on blocked attempts.
+- Image-only paste passing through by default and ordinary typing still
+  working.
+- Mixed text-and-image clipboard paste remaining blocked because it
+  contains text.
+- The options page explanatory copy, immediate propagation of the
+  optional image-blocking setting, and image paste blocked in editable,
+  noneditable, and cross-origin frame targets.
+- The "Text paste blocked." and "Image paste blocked." notices appearing
+  on the corresponding blocked attempts.
 
 Clipboard permission is granted to the test origin via
 `context.grantPermissions(["clipboard-read", "clipboard-write"])`; the
