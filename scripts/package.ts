@@ -6,8 +6,11 @@ import { buildDirectory, buildExtension, projectDirectory } from "./build.js";
 const files = [
   "LICENSE",
   "manifest.json",
+  "background.js",
   "clipboard-guard.js",
   "content.js",
+  "options.html",
+  "options.js",
   "icons/icon-16.png",
   "icons/icon-32.png",
   "icons/icon-48.png",

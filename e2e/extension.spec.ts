@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const extensionPath = fileURLToPath(new URL("../build", import.meta.url));
 const pasteShortcut = process.platform === "darwin" ? "Meta+V" : "Control+V";
+const chromiumExecutable = process.env.NO_PASTE_CHROMIUM_EXECUTABLE;
 
 let origin: string;
 let frameOrigin: string;
@@ -25,6 +26,7 @@ const pageHtml = (): string => `<!doctype html>
     <input id="input" aria-label="Input">
     <textarea id="textarea" aria-label="Textarea"></textarea>
     <div id="editable" contenteditable="true" aria-label="Editable"></div>
+    <div id="readonly" tabindex="0" aria-label="Readonly target"></div>
     <div id="shadow-host"></div>
     <iframe id="related-frame" srcdoc="<input id='related-input' aria-label='Related frame input'>"></iframe>
     <iframe id="data-frame" src="data:text/html,<input id='data-input' aria-label='Data frame input'>"></iframe>
@@ -75,11 +77,10 @@ async function launchContext(
   const args = withExtension
     ? [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`]
     : [];
-  const context = await chromium.launchPersistentContext(userDataDir, {
-    channel: "chromium",
-    headless: true,
-    args,
-  });
+  const browserOptions = chromiumExecutable
+    ? { args, executablePath: chromiumExecutable, headless: true }
+    : { args, channel: "chromium" as const, headless: true };
+  const context = await chromium.launchPersistentContext(userDataDir, browserOptions);
 
   await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin });
   return { context, userDataDir };
@@ -98,6 +99,90 @@ async function openTestPage(context: BrowserContext): Promise<Page> {
 
 async function putTextOnClipboard(page: Page, text: string): Promise<void> {
   await page.evaluate((value) => navigator.clipboard.writeText(value), text);
+}
+
+async function putImageOnClipboard(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const drawingContext = canvas.getContext("2d");
+    if (!drawingContext) {
+      throw new Error("Canvas 2D context is unavailable.");
+    }
+    drawingContext.fillRect(0, 0, 1, 1);
+    const image = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error("Failed to create the clipboard image."));
+        }
+      }, "image/png");
+    });
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": image })]);
+  });
+}
+
+async function putMixedClipboard(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const drawingContext = canvas.getContext("2d");
+    if (!drawingContext) {
+      throw new Error("Canvas 2D context is unavailable.");
+    }
+    drawingContext.fillRect(0, 0, 1, 1);
+    const image = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error("Failed to create the clipboard image."));
+        }
+      }, "image/png");
+    });
+    await navigator.clipboard.write([new ClipboardItem({
+      "image/png": image,
+      "text/plain": new Blob(["fixture text"], { type: "text/plain" }),
+    })]);
+  });
+}
+
+async function waitForExtensionServiceWorker(context: BrowserContext) {
+  const existing = context.serviceWorkers()[0];
+  if (existing) {
+    return existing;
+  }
+
+  try {
+    return await context.waitForEvent("serviceworker", { timeout: 5000 });
+  } catch (error) {
+    const started = context.serviceWorkers()[0];
+    if (started) {
+      return started;
+    }
+    throw error;
+  }
+}
+
+async function openOptionsPage(context: BrowserContext): Promise<Page> {
+  const serviceWorker = await waitForExtensionServiceWorker(context);
+  const extensionId = new URL(serviceWorker.url()).host;
+  const optionsPage = await context.newPage();
+  await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
+  return optionsPage;
+}
+
+async function enableImageBlocking(context: BrowserContext): Promise<void> {
+  const optionsPage = await openOptionsPage(context);
+  await expect(optionsPage.getByRole("heading", { name: "No Paste" })).toBeVisible();
+  await expect(optionsPage.getByText(/clipboard format metadata/)).toBeVisible();
+  await expect(optionsPage.getByText(/does not read, store, or transmit/)).toBeVisible();
+  await optionsPage.locator("#block-images").check();
+  await expect(optionsPage.locator("#save-status")).toHaveText("Saved.");
+  await optionsPage.close();
 }
 
 test.beforeAll(startServer);
@@ -151,6 +236,28 @@ test("blocks native text paste in webpage editing surfaces", async () => {
     await expect(page.frameLocator("#related-frame").locator("#related-input")).toHaveValue("");
     await expect(page.frameLocator("#data-frame").locator("#data-input")).toHaveValue("");
     await expect(page.frameLocator("#origin-frame").locator("#origin-input")).toHaveValue("");
+    const noneditableResult = await page.locator("#readonly").evaluate((target) => {
+      let pageReceivedEvent = false;
+      target.addEventListener("paste", () => {
+        pageReceivedEvent = true;
+      }, { once: true });
+      const transfer = new DataTransfer();
+      transfer.setData("text/plain", "fixture text");
+      const event = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: transfer,
+        composed: true,
+      });
+      const accepted = target.dispatchEvent(event);
+      return { accepted, defaultPrevented: event.defaultPrevented, pageReceivedEvent };
+    });
+    expect(noneditableResult).toEqual({
+      accepted: false,
+      defaultPrevented: true,
+      pageReceivedEvent: false,
+    });
+
     const notice = page.locator("[data-no-paste-notice]");
     await expect(notice).toHaveAttribute("aria-label", "Text paste blocked.");
     await expect(notice).toBeVisible();
@@ -200,7 +307,7 @@ test("blocks asynchronous text reads in the page world", async () => {
   }
 });
 
-test("allows ordinary typing and image-only paste events", async () => {
+test("allows ordinary typing and image-only paste while the optional setting is off", async () => {
   const launched = await launchContext({ withExtension: true });
 
   try {
@@ -208,50 +315,130 @@ test("allows ordinary typing and image-only paste events", async () => {
     await page.locator("#input").fill("typed text");
     await expect(page.locator("#input")).toHaveValue("typed text");
 
-    const result = await page.evaluate(() => {
+    await putImageOnClipboard(page);
+    await page.locator("#editable").press(pasteShortcut);
+    await expect(page.locator("#editable img")).toHaveCount(1);
+
+    const clipboardTypes = await page.evaluate(async () => {
+      const items = await navigator.clipboard.read();
+      return items.flatMap((item) => item.types);
+    });
+    expect(clipboardTypes).toEqual(["image/png"]);
+  } finally {
+    await closeContext(launched);
+  }
+});
+
+test("blocks mixed text and image clipboard paste while image blocking is off", async () => {
+  const launched = await launchContext({ withExtension: true });
+
+  try {
+    const page = await openTestPage(launched.context);
+    await putMixedClipboard(page);
+    await page.locator("#editable").press(pasteShortcut);
+
+    await expect(page.locator("#editable")).toHaveText("");
+    await expect(page.locator("#editable img")).toHaveCount(0);
+    await expect(page.locator("[data-no-paste-notice]")).toHaveAttribute(
+      "aria-label",
+      "Text paste blocked.",
+    );
+  } finally {
+    await closeContext(launched);
+  }
+});
+
+test("optional setting blocks image paste in editable, noneditable, and frame targets", async () => {
+  const launched = await launchContext({ withExtension: true });
+
+  try {
+    const page = await openTestPage(launched.context);
+    await enableImageBlocking(launched.context);
+
+    await putImageOnClipboard(page);
+    await page.locator("#editable").press(pasteShortcut);
+    await expect(page.locator("#editable img")).toHaveCount(0);
+    const notice = page.locator("[data-no-paste-notice]");
+    await expect(notice).toHaveAttribute("aria-label", "Image paste blocked.");
+    await expect(notice).toBeVisible();
+
+    const noneditableResult = await page.locator("#readonly").evaluate((target) => {
       let pageReceivedEvent = false;
-      window.addEventListener("paste", () => {
+      target.addEventListener("paste", () => {
         pageReceivedEvent = true;
       }, { once: true });
 
       const transfer = new DataTransfer();
-      transfer.items.add(new File(["image"], "image.png", { type: "image/png" }));
-      const accepted = window.dispatchEvent(new ClipboardEvent("paste", {
+      transfer.items.add(new File(["fixture image"], "image.png", { type: "image/png" }));
+      const event = new ClipboardEvent("paste", {
         bubbles: true,
         cancelable: true,
         clipboardData: transfer,
         composed: true,
-      }));
-
-      return { accepted, pageReceivedEvent };
-    });
-
-    expect(result).toEqual({ accepted: true, pageReceivedEvent: true });
-
-    const clipboardTypes = await page.evaluate(async () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = 1;
-      canvas.height = 1;
-      const drawingContext = canvas.getContext("2d");
-      if (!drawingContext) {
-        throw new Error("Canvas 2D context is unavailable.");
-      }
-      drawingContext.fillRect(0, 0, 1, 1);
-      const image = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error("Failed to create the clipboard image."));
-          }
-        }, "image/png");
       });
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": image })]);
-      const items = await navigator.clipboard.read();
-      return items.flatMap((item) => item.types);
+      if (!event.clipboardData) {
+        Object.defineProperty(event, "clipboardData", { value: transfer });
+      }
+      const accepted = target.dispatchEvent(event);
+      return { accepted, defaultPrevented: event.defaultPrevented, pageReceivedEvent };
+    });
+    expect(noneditableResult).toEqual({
+      accepted: false,
+      defaultPrevented: true,
+      pageReceivedEvent: false,
     });
 
-    expect(clipboardTypes).toEqual(["image/png"]);
+    const crossOriginFrame = page.frames().find((frame) => frame.url().startsWith(frameOrigin));
+    if (!crossOriginFrame) {
+      throw new Error("The cross-origin fixture frame did not load.");
+    }
+    const frameResult = await crossOriginFrame.locator("#origin-input").evaluate((target) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(["fixture image"], "image.png", { type: "image/png" }));
+      const event = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: transfer,
+        composed: true,
+      });
+      if (!event.clipboardData) {
+        Object.defineProperty(event, "clipboardData", { value: transfer });
+      }
+      const accepted = target.dispatchEvent(event);
+      return { accepted, defaultPrevented: event.defaultPrevented };
+    });
+    expect(frameResult).toEqual({ accepted: false, defaultPrevented: true });
+
+    const readError = await page.evaluate(async () => {
+      try {
+        await navigator.clipboard.read();
+        return null;
+      } catch (error) {
+        return error instanceof Error
+          ? { name: error.name, message: error.message }
+          : { name: "Error", message: String(error) };
+      }
+    });
+    expect(readError).toEqual({
+      name: "NotAllowedError",
+      message: "Image paste is blocked by No Paste.",
+    });
+
+    await page.reload();
+    await putImageOnClipboard(page);
+    await expect.poll(async () => page.evaluate(async () => {
+      try {
+        await navigator.clipboard.read();
+        return null;
+      } catch (error) {
+        return error instanceof Error
+          ? { name: error.name, message: error.message }
+          : { name: "Error", message: String(error) };
+      }
+    })).toEqual({
+      name: "NotAllowedError",
+      message: "Image paste is blocked by No Paste.",
+    });
   } finally {
     await closeContext(launched);
   }

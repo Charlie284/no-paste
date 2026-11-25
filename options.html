@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>No Paste options</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      body {
+        margin: 0;
+        background: Canvas;
+        color: CanvasText;
+      }
+      main {
+        box-sizing: border-box;
+        width: min(680px, 100%);
+        margin: 0 auto;
+        padding: 32px 20px 40px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+      h2 {
+        margin: 28px 0 10px;
+        font-size: 15px;
+      }
+      p {
+        margin: 8px 0;
+        line-height: 1.5;
+      }
+      label {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        font-weight: 600;
+      }
+      input {
+        margin-top: 3px;
+      }
+      .lede {
+        margin-top: 0;
+        color: GrayText;
+      }
+      .note {
+        color: GrayText;
+        font-size: 13px;
+      }
+      #save-status {
+        min-height: 1.5em;
+        margin-top: 12px;
+        font-size: 13px;
+      }
+    </style>
+    <script src="options.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <h1>No Paste</h1>
+      <p class="lede">Text paste is always blocked. Image paste is allowed unless you turn on the optional setting below.</p>
+
+      <h2>Clipboard blocking</h2>
+      <label for="block-images">
+        <input id="block-images" type="checkbox">
+        <span>Also block image paste</span>
+      </label>
+      <p id="save-status" role="status" aria-live="polite"></p>
+
+      <p>No Paste decides what to block from clipboard format metadata such as <code>text/plain</code> or <code>image/png</code>. It does not read, store, or transmit clipboard text, images, files, or other pasted contents.</p>
+      <p class="note">Changes are sent to open pages where Chrome already allows No Paste to run. Chrome's site access, Incognito, file-url, and per-profile controls continue to decide where the extension can operate; reload a page if it was open before the extension was installed or reloaded.</p>
+    </main>
+  </body>
+</html>
